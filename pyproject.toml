@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# Rename the package here (and the src/<name> directory) to re-brand the suite.
+name = "pescert"
+version = "0.1.0"
+description = "Ground-truth-free certification proxies for machine-learning interatomic potentials (MLIPs)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "pescert authors" }]
+keywords = ["MLIP", "interatomic-potential", "benchmark", "physics", "ASE"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "numpy>=1.22",
+    "ase>=3.22",
+]
+
+[project.optional-dependencies]
+plots = ["matplotlib>=3.5"]
+dev = ["pytest>=7.0", "ruff>=0.1"]
+
+[project.scripts]
+pescert = "pescert.cli:main"
+
+[project.urls]
+Homepage = "https://example.org/pescert"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E741"]  # allow short physics variable names (l, etc.)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
