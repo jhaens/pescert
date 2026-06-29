@@ -31,7 +31,6 @@ from .base import Budget, Eval
 
 @register("zero_modes")
 class ZeroModes(Eval):
-    section = "NEW-1"
     target = 0.0
     substrate_kind = "cluster"
 
@@ -76,7 +75,7 @@ class ZeroModes(Eval):
         # continuous defect: each known zero mode must be annihilated by H
         residuals = {
             lab: float(np.linalg.norm(h_sym @ v) / h_fro)
-            for lab, v in zip(labels, modes, strict=True)
+            for lab, v in zip(labels, modes)
         }
         continuous_defect = max(residuals.values()) if residuals else 0.0
 

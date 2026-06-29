@@ -24,7 +24,6 @@ from .base import Budget, Eval
 
 @register("reversibility")
 class Reversibility(Eval):
-    section = "OOB-3"
     target = 0.0
     substrate_kind = "cluster"
 

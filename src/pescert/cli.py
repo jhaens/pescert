@@ -12,25 +12,16 @@ from .suite import Suite
 
 
 def _load_calculator(path: str):
-    """Import ``module:attr`` (or ``module.attr``) and resolve it to an ASE calculator.
+    """Import ``module:attr`` (or ``module.attr``) to a Calculator instance/class/factory.
 
-    The attribute may be a Calculator instance, a Calculator subclass, or a
-    zero-argument factory that returns a calculator.
+    Coercion to an instance is handled centrally by :class:`ModelEngine`, so the CLI and
+    the Python API resolve a calculator identically.
     """
     if ":" in path:
         mod_name, attr = path.split(":", 1)
     else:
         mod_name, attr = path.rsplit(".", 1)
-    obj = getattr(importlib.import_module(mod_name), attr)
-    from ase.calculators.calculator import Calculator
-
-    if isinstance(obj, Calculator):
-        return obj
-    if isinstance(obj, type):
-        return obj()
-    if callable(obj):
-        return obj()
-    raise TypeError(f"{path!r} is not a calculator, class, or factory")
+    return getattr(importlib.import_module(mod_name), attr)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -59,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "list":
         for name in sorted(REGISTRY):
             ev = REGISTRY[name]
-            print(f"{name:22s} {ev.section:7s} {ev.substrate_kind}")
+            print(f"{name:22s} {ev.substrate_kind}")
         return 0
 
     if args.command == "run":

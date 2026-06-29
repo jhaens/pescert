@@ -60,8 +60,6 @@ class EvalResult:
     ----------
     name:
         Registry name of the proxy (e.g. ``"zero_modes"``).
-    section:
-        Spec section id (e.g. ``"NEW-1"``).
     target:
         Exact target value the true PES satisfies: ``0.0``, ``1.0``, or an int ``n``.
     raw_defect:
@@ -78,7 +76,6 @@ class EvalResult:
     """
 
     name: str
-    section: str
     target: float
     raw_defect: float
     score: float
@@ -101,7 +98,7 @@ class EvalResult:
     def __str__(self) -> str:
         gate = "" if self.gate is None else f" gate={'PASS' if self.gate else 'FAIL'}"
         return (
-            f"[{self.section}] {self.name}: target={self.target:g} "
+            f"{self.name}: target={self.target:g} "
             f"defect={self.raw_defect:.3e} score={self.score:.3f} "
             f"calls={self.n_model_calls}{gate}"
         )

@@ -40,7 +40,6 @@ def _count_local_minima(y: np.ndarray) -> int:
 
 @register("smoothness")
 class Smoothness(Eval):
-    section = "KNOWN"
     target = 0.0  # defect target; a perfectly smooth single well scores 1
 
     substrate_kind = "cluster"

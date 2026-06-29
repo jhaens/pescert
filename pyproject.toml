@@ -3,12 +3,11 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# Rename the package here (and the src/<name> directory) to re-brand the suite.
 name = "pescert"
 version = "0.1.0"
 description = "Ground-truth-free certification proxies for machine-learning interatomic potentials (MLIPs)."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "pescert authors" }]
 keywords = ["MLIP", "interatomic-potential", "benchmark", "physics", "ASE"]

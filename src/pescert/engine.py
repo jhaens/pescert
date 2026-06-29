@@ -102,19 +102,48 @@ class _CallableCalculator(Calculator):
         self.results = results
 
 
+def _coerce_calculator(calculator) -> Calculator:
+    """Accept a Calculator instance, a Calculator subclass, or a zero-argument factory.
+
+    This makes the Python API forgiving in the same way the CLI is: passing the class
+    ``LennardJones`` (rather than ``LennardJones()``) is instantiated for you instead of
+    failing deep inside ASE.
+    """
+    if isinstance(calculator, Calculator):
+        return calculator
+    if isinstance(calculator, type) or callable(calculator):
+        try:
+            instance = calculator()
+        except TypeError as exc:
+            raise TypeError(
+                "ModelEngine received a calculator class/factory that needs arguments; "
+                "pass a constructed instance instead, e.g. "
+                "from_ase_calculator(LennardJones(epsilon=1.0))."
+            ) from exc
+        if isinstance(instance, Calculator):
+            return instance
+    raise TypeError(
+        "Expected an ASE Calculator instance, a Calculator subclass, or a zero-argument "
+        f"factory returning one; got {calculator!r}."
+    )
+
+
 class ModelEngine:
     """Wrap a model and expose only physical quantities plus derived utilities.
 
     Parameters
     ----------
     calculator:
-        An ASE :class:`~ase.calculators.calculator.Calculator`.
+        An ASE :class:`~ase.calculators.calculator.Calculator` instance, a Calculator
+        subclass, or a zero-argument factory returning one (the latter two are
+        instantiated for you).
     count:
         If ``True`` (default) every underlying single-point evaluation is counted
         and exposed through :attr:`n_calls`.
     """
 
     def __init__(self, calculator: Calculator, *, count: bool = True):
+        calculator = _coerce_calculator(calculator)
         self._counter: list[int] = [0]
         self._ccalc = _CountingCalculator(calculator, self._counter, count=count)
         self._inner = calculator
@@ -242,7 +271,7 @@ class ModelEngine:
         *,
         fmax: float = 1e-3,
         steps: int = 300,
-        optimizer: str = "FIRE",
+        optimizer: str = "BFGS",
     ) -> Atoms:
         """Relax to the *model's own* stationary point (no DFT, no reference).
 

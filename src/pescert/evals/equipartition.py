@@ -27,7 +27,6 @@ from .base import Budget, Eval
 
 @register("equipartition")
 class Equipartition(Eval):
-    section = "NEW-2b"
     target = 1.0
     substrate_kind = "cluster"
 
@@ -41,13 +40,13 @@ class Equipartition(Eval):
         temperature_K: float = 20.0,
         warmup_steps: int = 250,
         n_steps: int = 350,
-        sample_every: int = 4,
+        sample_every: int = 1,
         dt: float = 1.0,
         friction: float = 0.1,
         eps: float = 1e-3,
         relax_fmax: float = 1e-3,
         tol_rel: float = 1e-3,
-        scale: float = 0.25,
+        scale: float = 0.5,
         do_relax: bool = True,
         **cfg,
     ) -> EvalResult:
@@ -77,7 +76,7 @@ class Equipartition(Eval):
             work,
             timestep=dt * units.fs,
             temperature_K=temperature_K,
-            friction=friction,
+            friction=friction/units.fs,
             rng=np.random.default_rng(seed),
         )
         q2_acc = np.zeros(omega2.shape)

@@ -25,7 +25,6 @@ from .base import Budget, Eval
 
 @register("betti")
 class MaxwellBetti(Eval):
-    section = "OOB-1"
     target = 0.0
     substrate_kind = "cluster"
 

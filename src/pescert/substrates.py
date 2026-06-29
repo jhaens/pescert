@@ -70,24 +70,18 @@ def cluster(element: str = "Ar", n_atoms: int = 13, *, scale: float = 1.0) -> At
 
 
 def trimer(
-    elements: str | tuple[str, str, str] = "O",
+    elements: str | tuple[str, str, str] = "Ar",
     *,
     d_bond: float | None = None,
     d_base: float | None = None,
     scale: float = 1.0,
 ) -> Atoms:
-    """Build a symmetric A-B-C trimer with A and C the *same* species.
-
-    The mirror plane ``x = 0`` swaps A (index 0) and C (index 2) and fixes B (index 1):
-    exactly the reflection+permutation symmetry NEW-3(i) exploits.  ``elements`` may be
-    a single symbol (A=B=C) or a 3-tuple ``(A, B, C)`` with ``A == C``.
+    """Build a symmetric A-B-C trimer with A, B and C the *same* species.
     """
     if isinstance(elements, str):
         a = b = c = elements
     else:
-        a, b, c = elements
-        if a != c:
-            raise ValueError("trimer requires A and C to be the same species (A == C)")
+        raise ValueError("trimer requires A, B and C to be the same species (A == B == C)")
     if d_bond is None:
         d_bond = _nn_distance(b, scale)
     if d_base is None:
@@ -97,8 +91,8 @@ def trimer(
     positions = np.array(
         [
             [-half, 0.0, 0.0],  # A (index 0)
-            [0.0, height, 0.0],  # B (index 1), apex, on the mirror plane
-            [half, 0.0, 0.0],  # C (index 2)
+            [0.0, height, 0.0], # B (index 1), apex
+            [half, 0.0, 0.0],   # C (index 2)
         ]
     )
     positions -= positions.mean(0)
@@ -117,7 +111,7 @@ def bulk_crystal(element: str = "Ar", *, scale: float = 1.0, repeat: int = 1) ->
 
     try:
         atoms = ase_bulk(element)
-    except Exception:  # noqa: BLE001 - element has no ASE reference state
+    except Exception:  # Element has no ASE reference state
         a_fcc = _nn_distance(element, scale) * np.sqrt(2.0)
         atoms = ase_bulk(element, crystalstructure="fcc", a=a_fcc)
     if repeat > 1:
@@ -132,6 +126,12 @@ def make_substrate(spec, kind: str) -> Atoms:
     tuple of element symbols.  Used by :class:`~pescert.suite.Suite` to build the
     right default substrate per proxy.
     """
+    try: 
+        from ase.io import read
+        atoms = read(spec)
+        return atoms
+    except Exception:
+        pass
     if isinstance(spec, Atoms):
         return spec
     if kind == "trimer":

@@ -19,7 +19,6 @@ def test_score_from_defect_monotone():
 def test_result_json_serializable():
     r = EvalResult(
         name="x",
-        section="NEW-1",
         target=0.0,
         raw_defect=1e-3,
         score=0.9,
@@ -36,8 +35,8 @@ def test_result_json_serializable():
 
 def test_aggregate_geometric_mean():
     results = [
-        EvalResult("a", "KNOWN", 0.0, 0.0, 1.0, 5, {}, gate=True),
-        EvalResult("b", "KNOWN", 0.0, 0.0, 0.25, 5, {}, gate=False),
+        EvalResult("a", 0.0, 0.0, 1.0, 5, {}, gate=True),
+        EvalResult("b", 0.0, 0.0, 0.25, 5, {}, gate=False),
     ]
     agg = aggregate(results)
     assert np.isclose(agg["overall"], np.sqrt(1.0 * 0.25))
@@ -49,8 +48,8 @@ def test_aggregate_geometric_mean():
 
 def test_aggregate_ignores_nan_scores():
     results = [
-        EvalResult("a", "KNOWN", 0.0, 0.0, 1.0, 5, {}),
-        EvalResult("skipped", "OOB-2", 0.0, float("nan"), float("nan"), 0, {"skipped": True}),
+        EvalResult("a", 0.0, 0.0, 1.0, 5, {}),
+        EvalResult("skipped", 0.0, float("nan"), float("nan"), 0, {"skipped": True}),
     ]
     agg = aggregate(results)
     assert np.isclose(agg["overall"], 1.0)

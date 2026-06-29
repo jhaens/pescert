@@ -23,7 +23,6 @@ from .base import Budget, Eval
 
 @register("equivariance")
 class Equivariance(Eval):
-    section = "KNOWN"
     target = 0.0
     substrate_kind = "cluster"
 

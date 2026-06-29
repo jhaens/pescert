@@ -47,13 +47,12 @@ class Eval(ABC):
     """Abstract proxy.
 
     Subclasses set the class attributes :attr:`name` (via ``@register``),
-    :attr:`section`, :attr:`target`, and :attr:`substrate_kind`, and implement
+    :attr:`target`, and :attr:`substrate_kind`, and implement
     :meth:`run`.  ``run`` must respect ``max_calls``, be deterministic given
     ``seed``, and set :attr:`EvalResult.n_model_calls` to the calls it consumed.
     """
 
     name: str = "eval"
-    section: str = ""
     target: float = 0.0
     #: which default substrate the Suite should build: "cluster" | "trimer" | "bulk".
     substrate_kind: str = "cluster"
@@ -82,7 +81,6 @@ class Eval(ABC):
     ) -> EvalResult:
         return EvalResult(
             name=self.name,
-            section=self.section,
             target=float(self.target),
             raw_defect=float(raw_defect),
             score=float(score),

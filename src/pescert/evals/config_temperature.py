@@ -27,7 +27,6 @@ from .base import Budget, Eval
 
 @register("config_temperature")
 class ConfigTemperature(Eval):
-    section = "NEW-2a"
     target = 1.0
     substrate_kind = "cluster"
 
@@ -41,12 +40,12 @@ class ConfigTemperature(Eval):
         temperature_K: float = 40.0,
         warmup_steps: int = 250,
         n_steps: int = 400,
-        sample_every: int = 15,
+        sample_every: int = 4,
         n_hutchinson: int = 4,
-        dt: float = 1.0,
+        dt: float = 0.5,
         friction: float = 0.1,
         eps: float = 1e-3,
-        scale: float = 0.5,
+        scale: float = 1,
         do_relax: bool = True,
         **cfg,
     ) -> EvalResult:
@@ -65,7 +64,7 @@ class ConfigTemperature(Eval):
             work,
             timestep=dt * units.fs,
             temperature_K=temperature_K,
-            friction=friction,
+            friction=friction/units.fs,
             rng=np.random.default_rng(seed),
         )
 
@@ -129,7 +128,7 @@ class ConfigTemperature(Eval):
                 "scale": scale,
                 "ratio_series": [
                     float(f2 / (units.kB * trh * tk))
-                    for f2, trh, tk in zip(f2_samples, trh_samples, tkin_samples, strict=True)
+                    for f2, trh, tk in zip(f2_samples, trh_samples, tkin_samples)
                     if trh > 0 and tk > 0
                 ],
             },

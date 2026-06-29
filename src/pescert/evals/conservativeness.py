@@ -26,7 +26,6 @@ from .base import Budget, Eval
 
 @register("conservativeness")
 class Conservativeness(Eval):
-    section = "KNOWN"
     target = 0.0
     substrate_kind = "cluster"
 

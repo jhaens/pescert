@@ -62,8 +62,8 @@ class Report:
     def summary(self) -> str:
         """Build (and print) the markdown results table from spec section 4."""
         header = (
-            "| Proxy | Section | Target | Defect | Score | Calls | Gate |\n"
-            "|---|---|---|---|---|---|---|"
+            "| Proxy | Target | Defect | Score | Calls | Gate |\n"
+            "|------|---|---|---|---|"
         )
         rows = [header]
         for r in self.results:
@@ -71,7 +71,7 @@ class Report:
             score = "skip" if r.score != r.score else f"{r.score:.3f}"
             gate = "" if r.gate is None else ("PASS" if r.gate else "FAIL")
             rows.append(
-                f"| {r.name} | {r.section} | {r.target:g} | {defect} | {score} | "
+                f"| {r.name} | {r.target:g} | {defect} | {score} | "
                 f"{r.n_model_calls} | {gate} |"
             )
         agg = self.aggregate

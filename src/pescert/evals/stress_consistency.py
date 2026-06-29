@@ -36,7 +36,6 @@ def _strain_tensor(voigt_strain: np.ndarray) -> np.ndarray:
 
 @register("stress_consistency")
 class StressConsistency(Eval):
-    section = "OOB-2"
     target = 0.0
     substrate_kind = "bulk"
 
@@ -55,7 +54,7 @@ class StressConsistency(Eval):
         if not np.any(atoms.pbc):
             return self._skip("substrate is not periodic; stress is undefined", budget)
         if not engine.has_stress(atoms):
-            return self._skip("model does not expose a stress; OOB-2 not applicable", budget)
+            return self._skip("model does not expose a stress", budget)
 
         sigma_pred = engine.stress_voigt(atoms)  # 1 call
         cell0 = np.array(atoms.get_cell())

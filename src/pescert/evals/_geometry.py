@@ -66,7 +66,7 @@ def rigid_zero_modes(
         labels.append(lab)
     # rotations: v_i = e_a x r_i
     if rotations:
-        for a, lab in zip(range(3), ["Rx", "Ry", "Rz"], strict=True):
+        for a, lab in zip(range(3), ["Rx", "Ry", "Rz"]):
             e = np.zeros(3)
             e[a] = 1.0
             v = np.cross(np.tile(e, (n, 1)), rel)

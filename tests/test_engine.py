@@ -84,6 +84,22 @@ def test_stress_unsupported_raises():
     assert engine.has_stress(atoms) is False
 
 
+def test_accepts_class_instance_and_factory():
+    # passing the class (not an instance) must work just like the CLI -- regression test
+    from ase.calculators.lj import LennardJones
+
+    atoms = Atoms("Ar2", positions=[[0, 0, 0], [1.1, 0, 0]])
+    e_class = from_ase_calculator(LennardJones).energy(atoms)
+    e_instance = from_ase_calculator(LennardJones()).energy(atoms)
+    e_factory = from_ase_calculator(lambda: LennardJones()).energy(atoms)
+    assert e_class == e_instance == e_factory
+
+
+def test_rejects_non_calculator():
+    with pytest.raises(TypeError):
+        from_ase_calculator(42)
+
+
 def test_from_callable_path():
     def efn(a):
         return float(0.5 * np.sum(a.get_positions() ** 2))
