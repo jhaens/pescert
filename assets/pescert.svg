@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="pescert">
+  <defs>
+    <linearGradient id="pesc-mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b9cf5"/>
+      <stop offset=".55" stop-color="#7b6ef0"/>
+      <stop offset="1" stop-color="#a061ee"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 2.2l12 6.9v13.8l-12 6.9-12-6.9V9.1z" fill="url(#pesc-mark)"/>
+  <path d="M10.4 9.2c2.3 0 2.1 11.9 5.3 11.9 3.4 0 3.1-6.8 8.5-6.8"
+        fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+</svg>

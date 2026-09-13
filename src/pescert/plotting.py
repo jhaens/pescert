@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 
+from .registry import REGISTRY
 from .result import EvalResult
 
 
@@ -32,7 +33,9 @@ def plot_report(report, directory: str) -> list[str]:
 def _plot_one(plt, r: EvalResult):
     d = r.details
     fig, ax = plt.subplots(figsize=(5, 3.2))
-    title = f"[{r.section}] {r.name}  score={r.score:.3f}"
+    section = getattr(REGISTRY.get(r.name), "section", "")
+    title = f"[{section}] {r.name}  score={r.score:.3f}" if section else \
+        f"{r.name}  score={r.score:.3f}"
 
     if r.name == "smoothness" and "s_grid" in d:
         ax.plot(d["s_grid"], d["energies"], label="E(s)")

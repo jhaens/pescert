@@ -15,10 +15,9 @@ __all__ = ["Eval", "Budget"]
 class Budget:
     """Track and enforce a per-run model-call budget.
 
-    Snapshots :attr:`ModelEngine.n_calls` at construction; :attr:`used` is the delta
-    since.  Metrics call :meth:`would_exceed` *before* an expensive batch so they can
-    shrink sampling rather than silently overrun, and record ``budget_limited`` in
-    their details when they do.
+    Snapshots :attr:`ModelEngine.n_calls` at construction; :attr:`used` is the delta.
+    Proxies call :meth:`would_exceed` *before* an expensive batch so they can shrink
+    their sampling rather than silently overrun.
     """
 
     def __init__(self, engine: ModelEngine, max_calls: int | None):
@@ -56,6 +55,9 @@ class Eval(ABC):
     target: float = 0.0
     #: which default substrate the Suite should build: "cluster" | "trimer" | "bulk".
     substrate_kind: str = "cluster"
+    #: whether ``run`` accepts a ``trajectory_cache``; the Suite hands the shared
+    #: Langevin trajectory only to proxies that declare this.
+    uses_trajectory: bool = False
 
     @abstractmethod
     def run(

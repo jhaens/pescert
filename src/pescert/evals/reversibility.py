@@ -1,6 +1,6 @@
-"""OOB-3 -- NVE time-reversibility round-trip (classic MD code-validation trick).
+"""Time-reversibility: an NVE round-trip (classic MD code-validation trick).
 
-Spec: section 3, OOB-3.
+Section: Self-consistency.
 
 Identity.  Integrate NVE forward N steps, flip all velocities, integrate N steps back.
 A smooth, conservative PES with a symplectic integrator returns near the start.
@@ -24,6 +24,7 @@ from .base import Budget, Eval
 
 @register("reversibility")
 class Reversibility(Eval):
+    section = "Self-consistency"
     target = 0.0
     substrate_kind = "cluster"
 
@@ -37,7 +38,7 @@ class Reversibility(Eval):
         n_steps: int = 100,
         dt: float = 1.0,
         temperature_K: float = 30.0,
-        scale: float = 0.05,
+        scale: float = 0.001,
         **cfg,
     ) -> EvalResult:
         from ase.md.verlet import VelocityVerlet
@@ -59,8 +60,7 @@ class Reversibility(Eval):
         dyn.attach(record, interval=1)
         dyn.run(n_steps)
 
-        # reverse momenta and integrate back
-        work.set_velocities(-work.get_velocities())
+        work.set_velocities(-work.get_velocities())  # reverse and integrate back
         dyn.run(n_steps)
 
         r1 = work.get_positions()

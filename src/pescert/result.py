@@ -1,11 +1,10 @@
-"""Uniform result object, score normalization, and aggregation (spec section 6).
+"""Uniform result object, score normalization, and aggregation.
 
-Every proxy returns the same :class:`EvalResult`: the exact target value (0, 1, or
-``n``), the non-negative raw deviation from it, a normalized score in ``[0, 1]``
-(1 == perfect), the model-call count, and a rich ``details`` dict.  Mapping a defect
-to a score is done by :func:`score_from_defect`; each proxy chooses and *records* the
-scale it used.  :func:`aggregate` implements the leaderboard aggregation: keep
-sub-scores separate, also report an overall.
+Every proxy returns the same :class:`EvalResult`: the exact target (0, 1, or ``n``),
+the non-negative deviation from it, a normalized score in ``[0, 1]``, the model-call
+count, and a ``details`` dict.  :func:`score_from_defect` maps defect to score; each
+proxy chooses and *records* the scale it used.  :func:`aggregate` keeps the sub-scores
+separate and adds an overall.
 """
 
 from __future__ import annotations
@@ -17,15 +16,38 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["EvalResult", "score_from_defect", "aggregate"]
+__all__ = ["EvalResult", "score_from_defect", "aggregate", "AVERAGE_METHODS", "combine_scores"]
+
+#: Overall-score averaging methods, in increasing severity towards a single bad axis.
+AVERAGE_METHODS = ("arithmetic", "geometric", "harmonic")
+
+
+def combine_scores(scores, method: str = "arithmetic") -> float:
+    """Combine per-proxy ``scores`` into a single overall score in ``[0, 1]``.
+
+    ``"arithmetic"`` (default) is the plain average, ``"geometric"`` penalises any
+    single bad axis, ``"harmonic"`` is dominated by the worst.  Non-finite scores are
+    dropped; an empty input returns NaN.
+    """
+    s = np.asarray(list(scores), dtype=float)
+    s = s[np.isfinite(s)]
+    if s.size == 0:
+        return float("nan")
+    if method == "arithmetic":
+        return float(np.mean(s))
+    if method == "geometric":
+        return float(np.exp(np.mean(np.log(np.clip(s, 1e-12, 1.0)))))
+    if method == "harmonic":
+        return float(s.size / np.sum(1.0 / np.clip(s, 1e-12, 1.0)))
+    raise ValueError(f"unknown average method {method!r}; choose from {AVERAGE_METHODS}")
 
 
 def score_from_defect(defect: float, scale: float) -> float:
     """Map a non-negative ``defect`` to a score in ``(0, 1]`` via ``exp(-defect/scale)``.
 
-    A defect of 0 scores 1; a defect equal to ``scale`` scores ``1/e ~ 0.37``.  The
-    ``scale`` sets the sensitivity and **must be recorded** in the result details so
-    scores are interpretable across models.
+    A defect of 0 scores 1, a defect of ``scale`` scores ``1/e``.  ``scale`` sets the
+    sensitivity and **must be recorded** in the details, or scores are not comparable
+    across models.
     """
     if scale <= 0:
         raise ValueError("scale must be positive")
@@ -36,17 +58,24 @@ def score_from_defect(defect: float, scale: float) -> float:
 
 
 def _jsonable(obj: Any) -> Any:
-    """Recursively convert numpy types/arrays so a result is JSON-serializable."""
+    """Recursively convert numpy types/arrays so a result is JSON-serializable.
+
+    Non-finite values become ``null``.  ``NaN``/``Infinity`` are what Python's json
+    module emits for them by default, but they are **not** valid JSON: a strict reader
+    -- every browser's ``JSON.parse`` included -- rejects the whole document over one of
+    them, so a single diverged probe would make the run output unreadable.  ``null``
+    round-trips as "not measured", which is what a non-finite score means anyway.
+    """
     if isinstance(obj, dict):
         return {str(k): _jsonable(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_jsonable(v) for v in obj]
     if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    if isinstance(obj, (np.floating, np.integer)):
-        return obj.item()
+        return _jsonable(obj.tolist())
     if isinstance(obj, (np.bool_,)):
         return bool(obj)
+    if isinstance(obj, (np.floating, np.integer)):
+        obj = obj.item()  # fall through: a numpy inf must meet the finiteness check too
     if isinstance(obj, float) and not math.isfinite(obj):
         return None
     return obj
@@ -89,7 +118,7 @@ class EvalResult:
 
     def to_json(self, path: str | None = None, *, indent: int = 2) -> str:
         """Serialize to JSON; write to ``path`` if given and return the string."""
-        text = json.dumps(self.to_dict(), indent=indent)
+        text = json.dumps(self.to_dict(), indent=indent, allow_nan=False)
         if path is not None:
             with open(path, "w") as fh:
                 fh.write(text)
@@ -104,26 +133,26 @@ class EvalResult:
         )
 
 
-def aggregate(results: list[EvalResult]) -> dict:
-    """Aggregate a list of results (spec section 6).
+def aggregate(results: list[EvalResult], method: str = "arithmetic") -> dict:
+    """Aggregate a list of results into sub-scores, an overall, and the gate tally.
 
-    Returns sub-scores per proxy *and* an overall (geometric mean of scores, which
-    penalizes any single bad axis), plus the gate pass/fail tally.  Sub-scores are
-    always kept separate so non-conservative vs conservative models separate cleanly.
+    Sub-scores are always kept separate, so conservative and non-conservative models
+    separate cleanly.  ``method`` (see :func:`combine_scores`) is recorded under
+    ``"overall_method"``.
     """
     if not results:
-        return {"overall": float("nan"), "sub_scores": {}, "n_total_calls": 0}
+        return {
+            "overall": float("nan"),
+            "overall_method": method,
+            "sub_scores": {},
+            "n_total_calls": 0,
+        }
     sub = {r.name: r.score for r in results}
-    scores = np.array(list(sub.values()), dtype=float)
-    scores = scores[np.isfinite(scores)]
-    # geometric mean penalizes any single bad axis more than an arithmetic mean
-    if scores.size:
-        overall = float(np.exp(np.mean(np.log(np.clip(scores, 1e-12, 1.0)))))
-    else:
-        overall = float("nan")
+    overall = combine_scores(sub.values(), method)
     gates = {r.name: r.gate for r in results if r.gate is not None}
     return {
         "overall": overall,
+        "overall_method": method,
         "sub_scores": sub,
         "gates": gates,
         "gates_passed": sum(1 for v in gates.values() if v),

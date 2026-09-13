@@ -1,6 +1,6 @@
-"""KNOWN -- PES smoothness along a bond deformation (BSCT-style).
+"""Bond-deformation smoothness of the PES (BSCT-style).
 
-Spec: section 1 (prior art); BSCT bond deformation (arXiv:2602.04861).
+Section: Regularity.  BSCT bond deformation: arXiv:2602.04861.
 
 Identity.  A physical PES is a smooth single well along a bond stretch: it has no
 energy discontinuities, its projected force is monotone through a single zero
@@ -40,6 +40,7 @@ def _count_local_minima(y: np.ndarray) -> int:
 
 @register("smoothness")
 class Smoothness(Eval):
+    section = "Regularity"
     target = 0.0  # defect target; a perfectly smooth single well scores 1
 
     substrate_kind = "cluster"
@@ -69,9 +70,8 @@ class Smoothness(Eval):
 
         while budget.would_exceed(n_points) and n_points > 11:
             n_points -= 2
-        # asymmetric scan: cap compression at compress_frac * bond_len so we probe the
-        # physical Pauli wall and the dissociation tail without diving into the
-        # numerically-vertical (r << r0) part of a steep repulsion.
+        # asymmetric: capping compression probes the Pauli wall and the dissociation
+        # tail without diving into the numerically vertical part of a steep repulsion
         s_grid = np.linspace(-compress_frac * bond_len, stretch, n_points)
 
         energies = np.empty(n_points)
@@ -87,10 +87,8 @@ class Smoothness(Eval):
 
         f_span = float(fproj.max() - fproj.min()) + 1e-12
 
-        # (1) force-jolt ratio: a localized second difference of the projected force,
-        # normalized by the typical step.  A smooth (even steep) PES gives O(1); a kink
-        # or step in the force gives a large outlier.  This is the discontinuity / energy-
-        # jump diagnostic, measured on the force (the derivative of E) for scale-freeness.
+        # (1) force jolt: a localized second difference of the projected force over the
+        # typical step.  Smooth but steep gives O(1); a kink gives a large outlier.
         df = np.diff(fproj)
         if df.size >= 3:
             jolt = df[1:-1] - 0.5 * (df[:-2] + df[2:])

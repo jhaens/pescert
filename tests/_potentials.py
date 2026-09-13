@@ -2,7 +2,7 @@
 
 No DFT, no downloads.  Clean references (smooth, conservative, symmetric) must pass
 every "=0"/"=1" check; the deliberately broken wrappers must trip exactly the proxies
-the spec's sensitivity matrix predicts.
+the sensitivity matrix in :mod:`tests.test_sensitivity` predicts.
 """
 
 from __future__ import annotations
@@ -159,7 +159,7 @@ class SymmetryBreaking(_Wrapper):
 
     Breaks translational and rotational invariance (and reflection through planes not
     containing ``n_hat``) while staying conservative, so it should be caught by
-    equivariance, NEW-1 (both zero-mode residuals) and NEW-3(i), but not by
+    equivariance, zero_modes (both residuals) and the trimer 3-body term, but not by
     conservativeness.
     """
 
@@ -186,7 +186,7 @@ class SymmetryBreaking(_Wrapper):
 class BadStress(_Wrapper):
     """Return a wrong stress (scaled by ``factor``) while energy and forces stay correct.
 
-    Isolates a broken/approximate stress head: only OOB-2 should fire.
+    Isolates a broken/approximate stress head: only stress_consistency should fire.
     """
 
     def __init__(self, inner: Calculator, factor: float = 1.4):
@@ -201,3 +201,31 @@ class BadStress(_Wrapper):
         self.results["forces"] = f
         if s is not None:  # only when stress was actually requested (periodic path)
             self.results["stress"] = self.factor * s
+
+
+class ParityBreakingStress(_Wrapper):
+    """Leak a parity-odd contribution into the improper shear ``sigma_xy``.
+
+    Adds ``amplitude * sum_i sin(2 pi z_i)`` (in fractional z) to the ``xy`` stress
+    component -- a functional that flips sign under inversion of the fractional
+    coordinates, so ``sigma_xy(P R) = -sigma_xy(R)`` in the leaked part.  Energy, forces
+    and the proper shears ``sigma_xz``/``sigma_yz`` are untouched: a pure improper-symmetry
+    (E(3) but not full-O(3)) stress defect that only the parity probe should catch.
+    """
+
+    def __init__(self, inner: Calculator, amplitude: float = 0.02):
+        super().__init__(inner)
+        self.amplitude = amplitude
+
+    def calculate(self, atoms=None, properties=("energy",), system_changes=all_changes):
+        super().calculate(atoms, properties, system_changes)
+        e, f, s = self._inner_results(atoms, properties)
+        self.results["energy"] = e
+        self.results["free_energy"] = e
+        self.results["forces"] = f
+        if s is not None:
+            frac = atoms.get_scaled_positions()
+            odd = float(np.sum(np.sin(2.0 * np.pi * frac[:, 2])))
+            s = np.array(s, dtype=float)
+            s[5] += self.amplitude * odd  # Voigt index 5 == xy
+            self.results["stress"] = s

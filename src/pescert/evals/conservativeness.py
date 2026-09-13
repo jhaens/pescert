@@ -1,6 +1,6 @@
-"""KNOWN -- 1D conservativeness (MLIP-Arena "conservation deviation").
+"""Collinear conservativeness (MLIP-Arena "conservation deviation").
 
-Spec: section 1 (prior art) / section 0 family 2 (self-consistency).
+Section: Self-consistency.
 
 Identity.  Along a 1D bond stretch parameterised by ``s`` (displace one atom of a
 bond along the bond axis), the projected force must equal minus the derivative of the
@@ -8,8 +8,8 @@ energy: ``F_j . u_hat = -dE/ds`` for a conservative model.  We compare the model
 projected force to a central difference of its own energy.
 
 Target: exactly **0** (mean absolute deviation between projected force and
-``-dE/ds``).  NEW-3(iii) generalises this to transverse directions; this proxy stays
-strictly collinear.
+``-dE/ds``).  The trimer probe generalises this to transverse directions; this proxy
+stays strictly collinear.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from .base import Budget, Eval
 
 @register("conservativeness")
 class Conservativeness(Eval):
+    section = "Self-consistency"
     target = 0.0
     substrate_kind = "cluster"
 
@@ -39,6 +40,7 @@ class Conservativeness(Eval):
         bond: tuple[int, int] | None = None,
         scan_range: float = 0.15,
         n_points: int = 31,
+        min_points: int = 9,  # floor when thinning the grid for a low-precision model
         scale: float = 0.05,
         **cfg,
     ) -> EvalResult:
@@ -52,6 +54,19 @@ class Conservativeness(Eval):
             n_points += 1
         while budget.would_exceed(n_points) and n_points > 5:
             n_points -= 2
+
+        # This probe's finite-difference step is the scan spacing, not a free eps, so
+        # respect the model's precision by thinning the grid rather than by shrinking it:
+        # the scan range is a physical choice and must stay put.  A float32 model may not
+        # reach the required spacing at all within the range, which is recorded rather
+        # than hidden -- the residual is then round-off, not non-conservativeness.
+        h_min = engine.fd_step(order=1, accuracy=4)
+        round_off_limited = False
+        if 2.0 * scan_range / (n_points - 1) < h_min:
+            n_fit = int(2.0 * scan_range / h_min) + 1
+            n_points = max(min_points, n_fit if n_fit % 2 else n_fit - 1)
+            round_off_limited = 2.0 * scan_range / (n_points - 1) < h_min
+
         s_grid = np.linspace(-scan_range, scan_range, n_points)
         h = s_grid[1] - s_grid[0]
 
@@ -66,10 +81,10 @@ class Conservativeness(Eval):
             energies[idx] = e
             fproj[idx] = float(f[j] @ u)
 
-        # 4th-order central difference of energy: F.u_hat = -dE/ds.  The high-order
-        # stencil keeps truncation error negligible on steep (e.g. repulsive-wall)
-        # regions, so a finite defect reflects genuine non-conservativeness (force not
-        # equal to -dE/ds, independent of step) rather than discretization.
+        # 4th-order central difference of E.  The high-order stencil keeps truncation
+        # error negligible on steep regions, so a finite defect is genuine
+        # non-conservativeness rather than discretization -- provided the spacing is
+        # above the model's round-off floor, which is what h_min enforces above.
         f_from_e = (
             -energies[:-4] + 8 * energies[1:-3] - 8 * energies[3:-1] + energies[4:]
         ) / (12 * h)
@@ -88,6 +103,9 @@ class Conservativeness(Eval):
                 "scan_range": scan_range,
                 "n_points": int(n_points),
                 "step": float(h),
+                "step_min_for_precision": float(h_min),
+                "precision": engine.precision,
+                "round_off_limited": bool(round_off_limited),
                 "scale": scale,
                 "max_residual": float(residual.max()),
                 "s_grid": s_grid.tolist(),

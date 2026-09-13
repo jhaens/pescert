@@ -6,7 +6,7 @@ import json
 
 import numpy as np
 
-from pescert import EvalResult, aggregate, score_from_defect
+from pescert import EvalResult, aggregate, combine_scores, score_from_defect
 
 
 def test_score_from_defect_monotone():
@@ -33,17 +33,45 @@ def test_result_json_serializable():
     assert parsed["gate"] is True
 
 
-def test_aggregate_geometric_mean():
+def test_aggregate_defaults_to_arithmetic_mean():
     results = [
         EvalResult("a", 0.0, 0.0, 1.0, 5, {}, gate=True),
         EvalResult("b", 0.0, 0.0, 0.25, 5, {}, gate=False),
     ]
     agg = aggregate(results)
-    assert np.isclose(agg["overall"], np.sqrt(1.0 * 0.25))
+    assert agg["overall_method"] == "arithmetic"
+    assert np.isclose(agg["overall"], (1.0 + 0.25) / 2)
     assert agg["sub_scores"] == {"a": 1.0, "b": 0.25}
     assert agg["gates_passed"] == 1
     assert agg["gates_total"] == 2
     assert agg["n_total_calls"] == 10
+
+
+def test_aggregate_method_selects_mean():
+    results = [
+        EvalResult("a", 0.0, 0.0, 1.0, 5, {}),
+        EvalResult("b", 0.0, 0.0, 0.25, 5, {}),
+    ]
+    assert np.isclose(aggregate(results, "geometric")["overall"], np.sqrt(1.0 * 0.25))
+    assert np.isclose(aggregate(results, "harmonic")["overall"], 2 / (1 / 1.0 + 1 / 0.25))
+
+
+def test_combine_scores_methods_and_ordering():
+    s = [1.0, 0.5, 0.25]
+    ar = combine_scores(s, "arithmetic")
+    ge = combine_scores(s, "geometric")
+    ha = combine_scores(s, "harmonic")
+    # harmonic <= geometric <= arithmetic (AM-GM-HM inequality)
+    assert ha <= ge <= ar
+    assert np.isclose(ar, np.mean(s))
+    assert np.isnan(combine_scores([], "arithmetic"))
+
+
+def test_combine_scores_unknown_method_raises():
+    import pytest
+
+    with pytest.raises(ValueError):
+        combine_scores([1.0], "median")
 
 
 def test_aggregate_ignores_nan_scores():

@@ -1,6 +1,6 @@
-"""OOB-2 -- stress vs energy-gradient (virial / thermodynamic) consistency.
+"""Stress--gradient consistency (virial / thermodynamic).
 
-Spec: section 3, OOB-2.
+Section: Self-consistency.
 
 Identity.  The stress is the volume-normalised strain derivative of the energy:
 ``sigma_ij = (1/V) dE/deps_ij``.  We finite-difference the energy over the six
@@ -19,23 +19,13 @@ from ase import Atoms
 from ..engine import ModelEngine
 from ..registry import register
 from ..result import EvalResult, score_from_defect
+from ._strain import apply_strain, strain_tensor
 from .base import Budget, Eval
-
-
-def _strain_tensor(voigt_strain: np.ndarray) -> np.ndarray:
-    """Symmetric strain tensor from an engineering Voigt strain vector."""
-    e1, e2, e3, e4, e5, e6 = voigt_strain
-    return np.array(
-        [
-            [e1, e6 / 2.0, e5 / 2.0],
-            [e6 / 2.0, e2, e4 / 2.0],
-            [e5 / 2.0, e4 / 2.0, e3],
-        ]
-    )
 
 
 @register("stress_consistency")
 class StressConsistency(Eval):
+    section = "Self-consistency"
     target = 0.0
     substrate_kind = "bulk"
 
@@ -46,11 +36,12 @@ class StressConsistency(Eval):
         *,
         max_calls: int | None = None,
         seed: int = 0,
-        delta: float = 1e-3,
+        delta: float | None = None,
         scale: float = 0.05,
         **cfg,
     ) -> EvalResult:
         budget = Budget(engine, max_calls)
+        delta = engine.fd_step(order=1, accuracy=2) if delta is None else delta
         if not np.any(atoms.pbc):
             return self._skip("substrate is not periodic; stress is undefined", budget)
         if not engine.has_stress(atoms):
@@ -64,13 +55,19 @@ class StressConsistency(Eval):
         for k in range(6):
             voigt = np.zeros(6)
             voigt[k] = delta
-            eps = _strain_tensor(voigt)
-            ep = self._strained_energy(engine, atoms, cell0, eps)
-            em = self._strained_energy(engine, atoms, cell0, -eps)
+            eps = strain_tensor(voigt)
+            ep = engine.energy(apply_strain(atoms, cell0, eps))
+            em = engine.energy(apply_strain(atoms, cell0, -eps))
             sigma_fd[k] = (ep - em) / (2 * delta) / volume
 
-        denom = np.linalg.norm(sigma_fd) + 1e-12
-        defect = float(np.linalg.norm(sigma_pred - sigma_fd) / denom)
+        # Frobenius norm of the full (3x3) tensor from its Voigt vector: the three shear
+        # components are off-diagonal and therefore enter twice.
+        def _frob(v):
+            return float(np.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2
+                                 + 2.0 * (v[3] ** 2 + v[4] ** 2 + v[5] ** 2)))
+
+        denom = _frob(sigma_fd) + 1e-12
+        defect = _frob(sigma_pred - sigma_fd) / denom
         score = score_from_defect(defect, scale)
         gate = defect < 5 * scale
 
@@ -81,19 +78,13 @@ class StressConsistency(Eval):
             gate=gate,
             details={
                 "delta": delta,
+                "precision": engine.precision,
                 "scale": scale,
                 "stress_pred_voigt": sigma_pred.tolist(),
                 "stress_fd_voigt": sigma_fd.tolist(),
                 "abs_residual": float(np.linalg.norm(sigma_pred - sigma_fd)),
             },
         )
-
-    @staticmethod
-    def _strained_energy(engine, atoms, cell0, eps_tensor):
-        f = np.eye(3) + eps_tensor
-        work = atoms.copy()
-        work.set_cell(cell0 @ f.T, scale_atoms=True)
-        return engine.energy(work)
 
     def _skip(self, message: str, budget: Budget) -> EvalResult:
         return self._result(

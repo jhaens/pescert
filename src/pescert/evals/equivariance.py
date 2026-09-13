@@ -1,6 +1,6 @@
-"""KNOWN -- equivariance under global rotation.
+"""Rotational equivariance under a global rotation.
 
-Spec: section 1 (prior art) / section 0 family 1 (symmetry).
+Section: Symmetry & invariance.
 
 Identity.  The energy is invariant and the forces are equivariant under any global
 rotation ``Q``: ``E(QR) = E(R)`` and ``F(QR) = Q F(R)``.
@@ -23,6 +23,7 @@ from .base import Budget, Eval
 
 @register("equivariance")
 class Equivariance(Eval):
+    section = "Symmetry & invariance"
     target = 0.0
     substrate_kind = "cluster"
 
@@ -59,7 +60,6 @@ class Equivariance(Eval):
 
         e_defect = float(np.mean(e_res))
         f_defect = float(np.mean(f_res))
-        # combine the two normalized residuals; primary defect is their sum
         defect = e_defect / scale_energy + f_defect / scale_force
         score = score_from_defect(defect, scale=1.0)
         gate = (e_defect < 5 * scale_energy) and (f_defect < 5 * scale_force)

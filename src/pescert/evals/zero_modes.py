@@ -1,6 +1,6 @@
-"""NEW-1 -- second-order symmetry residual (zero-mode / acoustic-sum-rule defect).
+"""Hessian null space and acoustic sum rule (second-order symmetry residual).
 
-Spec: section 2, NEW-1.
+Section: Symmetry & invariance.
 
 Identity.  At the model's *own* relaxed structure the Hessian ``H = d2E/dR2`` is forced
 by symmetry to have a known null space, with eigenvectors known analytically from
@@ -31,6 +31,7 @@ from .base import Budget, Eval
 
 @register("zero_modes")
 class ZeroModes(Eval):
+    section = "Symmetry & invariance"
     target = 0.0
     substrate_kind = "cluster"
 
@@ -41,7 +42,7 @@ class ZeroModes(Eval):
         *,
         max_calls: int | None = None,
         seed: int = 0,
-        eps: float = 1e-3,
+        eps: float | None = None,
         relax_fmax: float = 1e-3,
         relax_steps: int = 200,
         tol_rel: float = 1e-2,
@@ -50,6 +51,7 @@ class ZeroModes(Eval):
         **cfg,
     ) -> EvalResult:
         budget = Budget(engine, max_calls)
+        eps = engine.fd_step(order=1, accuracy=2) if eps is None else eps
         periodic = bool(np.any(atoms.pbc))
 
         if do_relax:
@@ -60,7 +62,7 @@ class ZeroModes(Eval):
         fmax_reached = float(relaxed.info.get("relax_fmax", np.nan))
 
         pos = relaxed.get_positions()
-        # build analytic zero modes (non-mass-weighted: exact null vectors of plain H)
+        # non-mass-weighted: exact null vectors of the plain H
         rotations = not periodic
         modes, labels = rigid_zero_modes(pos, masses=None, rotations=rotations)
         if periodic:
@@ -72,7 +74,7 @@ class ZeroModes(Eval):
         h_sym = 0.5 * (h + h.T)
         h_fro = np.linalg.norm(h_sym) + 1e-30
 
-        # continuous defect: each known zero mode must be annihilated by H
+        # each known zero mode must be annihilated by H
         residuals = {
             lab: float(np.linalg.norm(h_sym @ v) / h_fro)
             for lab, v in zip(labels, modes)
@@ -85,7 +87,7 @@ class ZeroModes(Eval):
         n_near_zero = int(np.sum(np.abs(eigvals) < tol))
         n_negative = int(np.sum(eigvals < -tol))
         mode_count_error = abs(n_near_zero - expected)
-        # eigenvalue gap above the zero block (reproducibility of the count)
+        # gap above the zero block: how reproducible the count is
         sorted_abs = np.sort(np.abs(eigvals))
         gap = (
             float(sorted_abs[expected] - sorted_abs[expected - 1])
@@ -115,6 +117,7 @@ class ZeroModes(Eval):
                 "eigenvalue_gap": gap,
                 "relax_fmax_reached": fmax_reached,
                 "eps": eps,
+                "precision": engine.precision,
                 "tol_rel": tol_rel,
                 "scale": scale,
             },

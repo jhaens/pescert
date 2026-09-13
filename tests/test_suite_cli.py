@@ -13,11 +13,12 @@ from pescert import Suite, available, from_ase_calculator
 from pescert.cli import main as cli_main
 
 
-def test_suite_default_runs_all(lj_engine, cluster13, trimer3, bulk_ar):
-    subs = {"cluster": cluster13, "trimer": trimer3, "bulk": bulk_ar}
-    report = Suite.default().run(lj_engine, subs, seed=0, budget_per_eval=2000)
+def test_suite_default_runs_all(lj_engine, cluster13, trimer3, bulk_ar, p2mm_ar):
+    subs = {"cluster": cluster13, "trimer": trimer3, "bulk": bulk_ar, "p2mm": p2mm_ar}
+    report = Suite.default().run(lj_engine, subs, seed=0, budget_per_eval=2500)
     assert len(report.results) == len(available())
     agg = report.aggregate
+    assert agg["overall_method"] == "geometric"
     assert 0.0 <= agg["overall"] <= 1.0
     assert agg["n_total_calls"] > 0
 
@@ -43,6 +44,28 @@ def test_suite_builds_substrate_from_element():
     engine = from_ase_calculator(clean_lj(rc=8.0))
     report = Suite.from_names(["equivariance"]).run(engine, "Ar", seed=0)
     assert report.results[0].score > 0.99
+
+
+def test_suite_multi_element_averages():
+    engine = from_ase_calculator(clean_lj(rc=8.0))
+    suite = Suite.from_names(["equivariance", "conservativeness"])
+    # both a list and a comma-separated string select the multi-element averaging path
+    for spec in (["Ar", "Ne", "Xe"], "Ar, Ne, Xe"):
+        report = suite.run(engine, spec, seed=0)
+        assert report.metadata["elements"] == ["Ar", "Ne", "Xe"]
+        assert set(report.metadata["per_element_overall"]) == {"Ar", "Ne", "Xe"}
+        # each averaged proxy records its per-element scores
+        assert set(report.results[0].details["per_element"]) == {"Ar", "Ne", "Xe"}
+        assert report.results[0].score > 0.99
+
+
+def test_aggregation_method_changes_overall():
+    engine = from_ase_calculator(clean_lj(rc=8.0))
+    suite = Suite.from_names(["equivariance", "conservativeness"])
+    for method in ("arithmetic", "geometric", "harmonic"):
+        report = suite.run(engine, "Ar", seed=0, agg_method=method)
+        assert report.aggregate["overall_method"] == method
+        assert 0.0 <= report.aggregate["overall"] <= 1.0
 
 
 def test_unknown_eval_raises():

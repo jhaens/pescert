@@ -78,3 +78,34 @@ def test_equipartition_clean(lj_engine, cluster13):
     assert r.target == 1.0
     assert abs(r.details["R_median"] - 1.0) < 0.35
     assert r.score > 0.5
+
+
+def test_parity_clean(lj_engine, p2mm_ar):
+    # a parity-symmetric (pairwise) model has a parity-even stress to machine precision
+    r = get_eval("parity").run(lj_engine, p2mm_ar, seed=0)
+    assert r.target == 0.0
+    assert r.score > 0.99
+    assert r.gate is True
+    assert r.details["improper_channel_xy"] < 1e-6
+
+
+def test_representation_clean(lj_engine, p2mm_ar):
+    # a strictly local model is exactly gauge-, size- and permutation-consistent
+    r = get_eval("representation").run(lj_engine, p2mm_ar, seed=0)
+    assert r.score > 0.99
+    assert r.gate is True
+
+
+def test_cross_maxwell_clean(lj_engine, p2mm_ar):
+    r = get_eval("cross_maxwell").run(lj_engine, p2mm_ar, seed=0, n_pairs=12)
+    assert r.target == 0.0
+    assert r.score > 0.9
+    assert r.gate is True
+    assert r.details["d_B"] < 5e-3  # strain-strain block is Voigt-symmetric
+
+
+def test_virial_clean(lj_engine, cluster13):
+    r = get_eval("virial").run(lj_engine, cluster13, seed=0, n_steps=1200)
+    assert r.target == 1.0
+    assert abs(r.details["rho_vir"] - 1.0) < 0.3
+    assert r.score > 0.6

@@ -9,7 +9,7 @@ description = "Ground-truth-free certification proxies for machine-learning inte
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "pescert authors" }]
+authors = [{name = "Jonas Hänseroth", email = "jonas.haenseroth@tu-ilmenau.de"}]
 keywords = ["MLIP", "interatomic-potential", "benchmark", "physics", "ASE"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -30,14 +30,14 @@ dev = ["pytest>=7.0", "ruff>=0.1"]
 pescert = "pescert.cli:main"
 
 [project.urls]
-Homepage = "https://example.org/pescert"
+Homepage = "https://jhaens.github.io/pescert-bench"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]
@@ -46,3 +46,4 @@ ignore = ["E741"]  # allow short physics variable names (l, etc.)
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["src"]

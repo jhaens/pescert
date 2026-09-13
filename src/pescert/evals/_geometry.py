@@ -28,7 +28,6 @@ def is_linear(positions: np.ndarray, tol: float = 1e-6) -> bool:
     p = positions - positions.mean(0)
     if len(p) < 3:
         return True
-    # rank of the coordinate spread
     s = np.linalg.svd(p, compute_uv=False)
     return s[1] < tol * max(s[0], 1e-30)
 
@@ -41,10 +40,9 @@ def rigid_zero_modes(
 ) -> tuple[np.ndarray, list[str]]:
     """Analytic translational (and rotational) zero modes from geometry alone.
 
-    Returns an orthonormal basis ``(n_modes, 3N)`` and a list of labels.  These are
-    the exact null vectors of the (mass-weighted, if ``masses`` given) Hessian forced
-    by translational/rotational invariance of the energy -- no diagonalisation, no
-    reference needed (spec NEW-1).
+    Returns an orthonormal basis ``(n_modes, 3N)`` and labels.  These are the exact null
+    vectors of the (mass-weighted, if ``masses`` given) Hessian forced by translational
+    and rotational invariance -- no diagonalisation, no reference.
     """
     pos = np.asarray(positions, dtype=float)
     n = len(pos)
@@ -57,7 +55,6 @@ def rigid_zero_modes(
 
     modes = []
     labels = []
-    # translations
     for a, lab in enumerate(["Tx", "Ty", "Tz"]):
         v = np.zeros((n, 3))
         v[:, a] = 1.0
@@ -76,11 +73,10 @@ def rigid_zero_modes(
                 modes.append(v.reshape(-1))
                 labels.append(lab)
 
+    # translations and rotations are non-orthogonal once mass-weighted
     basis = np.array(modes)
-    # orthonormalise (translations and rotations can be non-orthogonal once mass-weighted)
     q, _ = np.linalg.qr(basis.T)
     ortho = q.T[: len(basis)]
-    # keep labels aligned with the number of retained modes
     return ortho, labels[: len(ortho)]
 
 

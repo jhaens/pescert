@@ -1,6 +1,6 @@
-"""OOB-1 -- Maxwell-Betti reciprocity (structural mechanics, 1870s).
+"""Maxwell-Betti reciprocity (structural mechanics, 1870s).
 
-Spec: section 3, OOB-1.
+Section: Self-consistency.
 
 Identity.  The reciprocal theorem: the force induced at DOF ``(j, beta)`` by a unit
 displacement at ``(i, alpha)`` equals the force induced at ``(i, alpha)`` by a unit
@@ -25,6 +25,7 @@ from .base import Budget, Eval
 
 @register("betti")
 class MaxwellBetti(Eval):
+    section = "Self-consistency"
     target = 0.0
     substrate_kind = "cluster"
 
@@ -36,11 +37,12 @@ class MaxwellBetti(Eval):
         max_calls: int | None = None,
         seed: int = 0,
         n_pairs: int = 12,
-        delta: float = 1e-3,
+        delta: float | None = None,
         scale: float = 0.02,
         **cfg,
     ) -> EvalResult:
         budget = Budget(engine, max_calls)
+        delta = engine.fd_step(order=1, accuracy=2) if delta is None else delta
         ndof = 3 * len(atoms)
         rng = np.random.default_rng(seed)
 
@@ -55,9 +57,7 @@ class MaxwellBetti(Eval):
             jb = int(rng.integers(ndof))
             while jb == ia:
                 jb = int(rng.integers(ndof))
-            # response of jb to a push at ia  == H_{jb, ia}
             r1 = self._response(engine, atoms, r0, push=ia, read=jb, delta=delta)
-            # response of ia to a push at jb  == H_{ia, jb}
             r2 = self._response(engine, atoms, r0, push=jb, read=ia, delta=delta)
             asyms.append(abs(r1 - r2))
             responses.append((ia, jb, r1, r2))
@@ -75,6 +75,7 @@ class MaxwellBetti(Eval):
                 "n_pairs": int(n_pairs),
                 "seed": seed,
                 "delta": delta,
+                "precision": engine.precision,
                 "scale": scale,
                 "max_asymmetry": float(np.max(asyms)),
                 "pairs": [(int(a), int(b), float(x), float(y)) for a, b, x, y in responses],
