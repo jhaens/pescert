@@ -114,16 +114,15 @@ class ConfigTemperature(Eval):
                 z = rng.choice([-1.0, 1.0], size=3 * n_atoms)
                 trh += float(z @ engine.hvp(snap, z, eps=eps))
             trh_samples.append(trh / n_hutchinson)
-            # full 3N dof, to match the dof-free configurational temperature (ASE's
-            # get_temperature removes 3 COM dof, biasing the ratio by 3N/(3N-3))
+            # only the dof the trajectory samples carry kinetic energy: FixCom pins the
+            # centre of mass, and dividing by the full 3N would bias the ratio by 3N/(3N-3)
             kinetic = 0.5 * float(np.sum(masses * vel**2))
-            tkin_samples.append(2.0 * kinetic / (3 * n_atoms * units.kB))
+            tkin_samples.append(2.0 * kinetic / (traj.kinetic_dof * units.kB))
 
         mean_f2 = float(np.mean(f2_samples)) if f2_samples else float("nan")
         mean_trh = float(np.mean(trh_samples)) if trh_samples else float("nan")
         t_config = mean_f2 / (units.kB * mean_trh) if mean_trh > 0 else float("nan")
         t_kin = float(np.mean(tkin_samples)) if tkin_samples else float("nan")
-        # the ratio is self-normalizing: both temperatures scale with the sampled one
         ratio = t_config / t_kin if t_kin > 0 else float("nan")
         defect = abs(ratio - 1.0)
         score = score_from_defect(defect, scale)

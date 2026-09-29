@@ -36,7 +36,19 @@ def test_report_json_and_summary(tmp_path, lj_engine, cluster13):
     assert "results" in data and "aggregate" in data and "metadata" in data
     assert {r["name"] for r in data["results"]} == {"equivariance", "zero_modes"}
     table = report.summary()
-    assert "Proxy" in table and "overall score" in table
+    assert "Probe" in table and "overall score" in table
+    # padded columns: every table line has the header's width
+    lines = [ln for ln in table.splitlines() if ln.startswith("|")]
+    assert len({len(ln) for ln in lines}) == 1
+
+
+def test_single_element_list_is_that_element():
+    # ["Ar"] used to reach the trimer builder as a list and abort the whole run
+    engine = from_ase_calculator(clean_lj(rc=8.0))
+    suite = Suite.from_names(["equivariance", "trimer"])
+    as_list = suite.run(engine, ["Ar"], seed=0)
+    as_symbol = suite.run(engine, "Ar", seed=0)
+    assert [r.score for r in as_list.results] == [r.score for r in as_symbol.results]
 
 
 def test_suite_builds_substrate_from_element():
@@ -96,6 +108,8 @@ def test_cli_run_writes_json(tmp_path):
     assert rc == 0
     data = json.loads(out.read_text())
     assert len(data["results"]) == 2
+    # same overall score as Suite.run's default
+    assert data["aggregate"]["overall_method"] == "geometric"
 
 
 def test_cli_subprocess_entrypoint():

@@ -2,12 +2,13 @@
 
 :class:`Suite` selects proxies, builds the right default substrate per proxy (or uses
 user-supplied :class:`ase.Atoms`), runs each within a per-eval call budget, and returns
-a :class:`Report` that serializes to JSON and prints the section-4 results table.
+a :class:`Report` that serializes to JSON and prints the results table.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field
 
@@ -94,6 +95,8 @@ def _multi_elements(substrates) -> list[str] | None:
     the ordinary per-proxy default-substrate path is used.
     """
     if isinstance(substrates, str):
+        if os.path.isfile(substrates):
+            return None  # a structure file, whatever its name contains
         toks = _parse_elements(substrates)
         return toks if len(toks) > 1 else None
     if (
@@ -196,7 +199,7 @@ def _average_reports(per_element: dict[str, Report], names, agg_method: str) -> 
 
 @dataclass
 class Report:
-    """Collected results plus metadata; serializes and prints the section-4 table."""
+    """Collected results plus metadata and serializes."""
 
     results: list[EvalResult]
     metadata: dict = field(default_factory=dict)
@@ -227,20 +230,32 @@ class Report:
         return text
 
     def summary(self) -> str:
-        """Build (and print) the markdown results table."""
-        header = (
-            "| Proxy | Target | Defect | Score | Calls | Gate |\n"
-            "|---|---|---|---|---|---|"
-        )
-        rows = [header]
+        """Build (and print) the results as a markdown table, aligned for the terminal."""
+        header = ("Probe", "Target", "Defect", "Score", "Calls", "Gate")
+        numeric = (False, True, True, True, True, False)
+        body = []
         for r in self.results:
-            defect = "skip" if r.score != r.score else f"{r.raw_defect:.3e}"  # NaN check
-            score = "skip" if r.score != r.score else f"{r.score:.3f}"
+            if r.score != r.score:  # NaN: the probe declined to measure
+                defect = score = "skip"
+            elif (r.details or {}).get("error"):
+                defect, score = "crash", f"{r.score:.3f}"
+            else:
+                defect, score = f"{r.raw_defect:.3e}", f"{r.score:.3f}"
             gate = "" if r.gate is None else ("PASS" if r.gate else "FAIL")
-            rows.append(
-                f"| {r.name} | {r.target:g} | {defect} | {score} | "
-                f"{r.n_model_calls} | {gate} |"
+            body.append((r.name, f"{r.target:g}", defect, score, str(r.n_model_calls), gate))
+        widths = [max(len(row[i]) for row in (header, *body)) for i in range(len(header))]
+
+        def line(cells) -> str:
+            padded = (
+                c.rjust(w) if num else c.ljust(w) for c, w, num in zip(cells, widths, numeric)
             )
+            return "| " + " | ".join(padded) + " |"
+
+        # the separator's colons right-align the numbers when rendered as markdown, too
+        rule = "|" + "|".join(
+            "-" * (w + 1) + ":" if num else "-" * (w + 2) for w, num in zip(widths, numeric)
+        ) + "|"
+        rows = [line(header), rule, *(line(cells) for cells in body)]
         agg = self.aggregate
         if self.metadata.get("elements"):
             rows.append(f"\n_averaged over elements: {', '.join(self.metadata['elements'])}_")
@@ -312,11 +327,12 @@ class Suite:
         Parameters
         ----------
         substrates:
-            An :class:`ase.Atoms`, an element symbol/tuple, or a dict mapping eval name
-            or substrate kind (``"cluster"``/``"trimer"``/``"bulk"``/``"p2mm"``) to
-            ``Atoms``.  Passing *several* element symbols -- ``["Si", "C", "H"]`` or
-            ``"Si, C, H"`` -- runs the suite once per element and returns their average
-            (see :meth:`run_elements`).
+            An :class:`ase.Atoms`, an element symbol/tuple, the path of a structure file,
+            or a dict mapping eval name or substrate kind
+            (``"cluster"``/``"trimer"``/``"bulk"``/``"p2mm"``) to ``Atoms``.  Passing
+            *several* element symbols -- ``["Si", "C", "H"]`` or ``"Si, C, H"`` -- runs
+            the suite once per element and returns their average (see
+            :meth:`run_elements`).
         seed:
             Base seed forwarded to every proxy (reproducibility).
         budget_per_eval:

@@ -33,7 +33,8 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--element",
         default="Ar",
-        help="element for default substrates; several ('Si,C,H') averages over elements",
+        help="element for default substrates; several ('Si,C,H') averages over elements; "
+        "or a structure file",
     )
     run.add_argument(
         "--evals",
@@ -44,9 +45,9 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--budget", type=int, default=None, help="per-eval max model calls")
     run.add_argument(
         "--agg-method",
-        default="arithmetic",
+        default="geometric",
         choices=["arithmetic", "geometric", "harmonic"],
-        help="how to combine sub-scores into the overall (default: arithmetic)",
+        help="how to combine sub-scores into the overall (default: geometric)",
     )
     run.add_argument("--json", default=None, help="write the JSON report to this path")
     run.add_argument(

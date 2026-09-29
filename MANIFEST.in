@@ -1,0 +1,4 @@
+graft tests
+graft examples
+include assets/pescert.svg
+global-exclude __pycache__ *.py[cod]

@@ -12,8 +12,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from ase.build import bulk as ase_bulk
+from ase.build import molecule
 
-from pescert.substrates import RATTLE_STDEV, _nn_distance, _reference_crystal, cluster
+from pescert.substrates import (
+    RATTLE_STDEV,
+    _nn_distance,
+    _reference_crystal,
+    cluster,
+    make_substrate,
+)
 
 
 def _distances(atoms):
@@ -73,3 +80,31 @@ def test_fallback_for_elements_without_a_reference_crystal():
     d = _distances(cluster("S"))
     assert d.min() == pytest.approx(_nn_distance("S"), abs=4 * RATTLE_STDEV)
     assert int((d[0] < d.min() * 1.15).sum()) == 4  # diamond, not close packed
+
+
+def test_symbol_means_the_element_even_next_to_a_file_of_that_name(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    molecule("H2O").write("Ar", format="xyz")
+    assert make_substrate("Ar", "cluster").get_chemical_formula() == "Ar13"
+
+
+def test_structure_files_are_read(tmp_path):
+    path = tmp_path / "ch4.xyz"
+    molecule("CH4").write(str(path))
+    assert make_substrate(str(path), "cluster").get_chemical_formula() == "CH4"
+    assert make_substrate(path, "bulk").get_chemical_formula() == "CH4"
+
+
+def test_unusable_specs_say_what_is_wrong(tmp_path):
+    broken = tmp_path / "broken.xyz"
+    broken.write_text("not an xyz file\n")
+    with pytest.raises(Exception, match="xyz header"):  # ASE's parse error, not a KeyError
+        make_substrate(str(broken), "cluster")
+    with pytest.raises(ValueError, match="neither an element symbol nor a structure file"):
+        make_substrate(str(tmp_path / "missing.xyz"), "cluster")
+
+
+@pytest.mark.parametrize("kind", ["cluster", "trimer", "bulk", "p2mm"])
+def test_one_element_list_is_that_element(kind):
+    as_list, as_symbol = make_substrate(["Si"], kind), make_substrate("Si", kind)
+    assert np.allclose(as_list.get_positions(), as_symbol.get_positions())

@@ -33,8 +33,7 @@ __all__ = [
     "stored_steps",
 ]
 
-# Thermostat defaults shared by config_temperature, equipartition and virial: agreeing
-# on them is what lets the three read one trajectory.
+# Thermostat defaults shared by config_temperature, equipartition and virial:
 TEMPERATURE_K = 30.0
 WARMUP_STEPS = 400
 N_STEPS = 1100
@@ -113,6 +112,7 @@ class Trajectory:
         *,
         owner: str = "",
     ):
+        from ase.constraints import FixCom
         from ase.md.langevin import Langevin
 
         self.thermostat = thermostat
@@ -126,6 +126,12 @@ class Trajectory:
             else atoms.copy()
         )
         self._work = engine.attach(self.reference)
+        # pin the centre of mass with a constraint: Langevin's own fixcm does not sample
+        self._work.set_constraint(FixCom())
+        # kinetic degrees of freedom the trajectory samples: 3N minus the pinned centre
+        self.kinetic_dof = 3 * len(self.reference) - sum(
+            c.get_removed_dof(self._work) for c in self._work.constraints
+        )
         self._work.set_velocities(
             seeded_velocities(self.reference, thermostat.temperature_K, thermostat.seed)
         )
@@ -135,6 +141,7 @@ class Trajectory:
             temperature_K=thermostat.temperature_K,
             friction=thermostat.friction / units.fs,
             rng=np.random.default_rng(thermostat.seed),
+            fixcm=False
         )
         self._steps: list[int] = []
         self._pos: list[np.ndarray] = []
@@ -148,10 +155,12 @@ class Trajectory:
 
     # -- recording ---------------------------------------------------------
     def _store(self) -> None:
-        # get_forces() is a cache hit here: the Langevin step just evaluated them.
+        # get_forces() is a cache hit here: the Langevin step just evaluated them.  
+        # The stored forces are the model's own: FixCom would strip their net component, 
+        # and a net force is part of what the probes measure.
         self._steps.append(int(self._dyn.nsteps))
         self._pos.append(self._work.get_positions())
-        self._frc.append(self._work.get_forces())
+        self._frc.append(self._work.get_forces(apply_constraint=False))
         self._vel.append(self._work.get_velocities())
 
     @property

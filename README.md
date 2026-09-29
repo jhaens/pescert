@@ -17,9 +17,10 @@ Jacobian-vector products are matrix-free finite differences, so any architecture
 ## Install
 
 ```bash
-pip install -e .          # core (numpy, ase)
-pip install -e .[plots]   # + matplotlib for diagnostic figures
-pip install -e .[dev]     # + pytest, ruff
+git clone https://github.com/jhaens/pescert.git && cd pescert
+pip install .               # core (numpy, ase)
+pip install ".[plots]"      # + matplotlib for diagnostic figures
+pip install -e ".[dev]"     # editable, + pytest, ruff, for development
 ```
 
 ## Use
@@ -102,6 +103,44 @@ score.
 For a symmetry-constrained model whose forces come from differentiating an energy, many
 probes sit near machine precision by construction and act as correctness gates. They bite
 hardest on unconstrained and direct-force models.
+
+## Suite parameters
+
+A full run with every option, on the command line and in Python. The table below explains
+each one.
+
+```bash
+pescert run --calc <module:attr> --element <element or list> --evals <all or probe list> \
+            --seed <int> --budget <int> --agg-method <arithmetic|geometric|harmonic> \
+            --no-share-trajectory --json <path>
+```
+
+```python
+engine = from_ase_calculator(calc, precision=None)
+report = Suite.from_names(names).run(  # Suite.default() selects all 14 probes
+    engine,
+    substrates,
+    seed=0,
+    budget_per_eval=None,
+    configs=None,
+    agg_method="geometric",
+    share_trajectory=True,
+)
+report.to_json(path)
+```
+
+| Python | CLI | Default | What it does |
+|---|---|---|---|
+| `calc` | `--calc` | required | the model: an ASE calculator instance, class or zero-argument factory, on the command line as an import path; `from_callable()` wraps raw energy and force functions instead |
+| `precision` | — | `None` (detected) | the model's float precision, `"float32"` or `"float64"`, which sizes the finite-difference steps; `None` detects it with one extra model call |
+| `substrates` | `--element` | required (CLI: `Ar`) | the structures to probe: an element symbol or several (run per element, then averaged), or a structure file ASE can read; from Python also an `ase.Atoms`, or a dict mapping probe names or substrate kinds (`cluster`, `trimer`, `bulk`, `p2mm`) to `ase.Atoms` |
+| `names` | `--evals` | all 14 (`Suite.default()`) | which probes run: a list of probe names, on the command line `all` or a comma-separated list such as `zero_modes,trimer` |
+| `seed` | `--seed` | `0` | base seed of every randomized probe; the same seed reproduces a run |
+| `budget_per_eval` | `--budget` | `None` (no cap) | soft cap on model calls per probe: sampling shrinks to fit, but relaxations, Hessians and MD warm-up are not capped |
+| `configs` | — | `None` | per-probe keyword overrides keyed by probe name, e.g. `{"zero_modes": {"relax_fmax": 1e-4}}`; the options are the keyword arguments of each probe's `run()` |
+| `agg_method` | `--agg-method` | `"geometric"` | how the probe scores combine into the overall score: `arithmetic`, `geometric` or `harmonic` |
+| `share_trajectory` | `--no-share-trajectory` | `True` | one Langevin trajectory for the three statistical-mechanics probes instead of one each; the flag turns sharing off |
+| `to_json(path)` | `--json` | not written | writes the report as JSON |
 
 ## Tests
 

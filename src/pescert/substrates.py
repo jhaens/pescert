@@ -12,6 +12,8 @@ never from hardcoded chemistry.  Substrates are intentionally small (clusters
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 from ase import Atoms
 from ase.data import atomic_numbers, covalent_radii
@@ -241,21 +243,29 @@ def p2mm_crystal(element: str = "Si", *, scale: float = 1.0) -> Atoms:
     return atoms
 
 
-def make_substrate(spec, kind: str) -> Atoms:
-    """Resolve a substrate ``spec`` for a given ``kind`` ("cluster"/"trimer"/"bulk").
+def _is_element(spec) -> bool:
+    return isinstance(spec, str) and atomic_numbers.get(spec, 0) > 0
 
-    ``spec`` may be an :class:`ase.Atoms` (returned as-is), an element symbol, or a
-    tuple of element symbols.  Used by :class:`~pescert.suite.Suite` to build the
-    right default substrate per proxy.
+
+def make_substrate(spec, kind: str) -> Atoms:
+    """Resolve a substrate ``spec`` for a given ``kind`` ("cluster"/"trimer"/"bulk"/"p2mm").
+
+    ``spec`` may be an :class:`ase.Atoms` (returned as-is), an element symbol, a tuple of
+    element symbols, or the path of a structure file ASE can read (returned as read).  A
+    symbol always means the element, even next to a file of that name, and a file that
+    cannot be parsed raises ASE's own error.  Used by :class:`~pescert.suite.Suite` to
+    build the right default substrate per proxy.
     """
-    try:
-        from ase.io import read
-        atoms = read(spec)
-        return atoms
-    except Exception:
-        pass
     if isinstance(spec, Atoms):
         return spec
+    if isinstance(spec, (list, tuple)) and len(spec) == 1:
+        spec = spec[0]  # ["Si"] is the element Si
+    if isinstance(spec, (str, os.PathLike)) and not _is_element(spec):
+        if not os.path.isfile(spec):
+            raise ValueError(f"{spec!r} is neither an element symbol nor a structure file")
+        from ase.io import read
+
+        return read(spec)
     if kind == "trimer":
         return trimer(spec)
     if kind == "bulk":

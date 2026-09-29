@@ -1,4 +1,4 @@
-"""pescert -- ground-truth-free certification proxies for MLIPs.
+"""pescert -- reference-free certification proxies for MLIPs.
 
 Each proxy certifies a model against an *exact* number (0, 1, or ``n``) that the true
 Born-Oppenheimer PES satisfies by necessity -- with no DFT reference anywhere.  Each
